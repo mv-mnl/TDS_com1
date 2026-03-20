@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teoría de Colas — Calculadora Universal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181c24;
+    --border: #252a35;
+    --accent: #00e5ff;
+    --accent2: #ff4d6d;
+    --accent3: #a8ff3e;
+    --text: #e8ecf4;
+    --text-dim: #6b7280;
+    --text-mid: #9ca3af;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 3rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+  .header-tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--accent); }
+  .header-sub {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 0.3rem;
+  }
+
+  /* MODEL SELECTOR */
+  .model-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 2.5rem;
+  }
+  .model-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    padding: 1rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: left;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .model-btn::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.15s;
+  }
+  .model-btn:hover { border-color: var(--accent); color: var(--text); }
+  .model-btn:hover::before { transform: scaleY(1); }
+  .model-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.06);
+  }
+  .model-btn.active::before { transform: scaleY(1); }
+  .model-btn .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    background: var(--border);
+    color: var(--text-dim);
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-bottom: 0.4rem;
+  }
+  .model-btn.active .badge { background: rgba(0,229,255,0.15); color: var(--accent); }
+  .model-btn .name { display: block; line-height: 1.3; }
+
+  /* MAIN LAYOUT */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media(max-width: 720px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* PANEL */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 0.9rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .panel-header .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .panel-header h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-mid);
+  }
+  .panel-body { padding: 1.5rem 1.2rem; }
+
+  /* FORM */
+  .field { margin-bottom: 1.2rem; }
+  .field:last-child { margin-bottom: 0; }
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  label .sym {
+    color: var(--accent);
+    font-size: 0.8rem;
+    margin-right: 0.3rem;
+  }
+  .input-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  input[type="number"], select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.55rem 0.8rem;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    border-radius: 4px;
+    width: 100%;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,229,255,0.08);
+  }
+  select { cursor: pointer; }
+  .unit-select {
+    width: auto;
+    min-width: 110px;
+    flex-shrink: 0;
+  }
+
+  /* CHECKBOX */
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.3rem;
+  }
+  input[type="checkbox"] {
+    width: 14px; height: 14px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .checkbox-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-mid);
+    text-transform: none;
+    letter-spacing: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  /* COST FIELDS */
+  .cost-section {
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+    border-top: 1px dashed var(--border);
+    display: none;
+  }
+  .cost-section.visible { display: block; }
+  .cost-section label { color: var(--accent2); }
+  .cost-section label .sym { color: var(--accent2); }
+
+  /* SOLVE BUTTON */
+  .solve-btn {
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 0.9rem;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .solve-btn:hover {
+    background: #33ecff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,229,255,0.3);
+  }
+  .solve-btn:active { transform: translateY(0); }
+
+  /* RESULTS */
+  .results-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    gap: 0.8rem;
+    color: var(--text-dim);
+  }
+  .results-empty .icon {
+    font-size: 2rem;
+    opacity: 0.3;
+  }
+  .results-empty p {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .result-section {
+    margin-bottom: 1.2rem;
+  }
+  .result-section-title {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.3rem 0;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(0,229,255,0.15);
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    gap: 0.5rem;
+    animation: fadeIn 0.3s ease both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .result-key {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-mid);
+    flex: 1;
+  }
+  .result-key .formula {
+    display: block;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  .result-val {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent3);
+    white-space: nowrap;
+  }
+  .result-val.highlight { color: var(--accent); font-size: 1rem; }
+  .result-val.cost { color: var(--accent2); }
+  .result-val.warn { color: #f59e0b; }
+
+  /* ERROR */
+  .error-box {
+    background: rgba(255,77,109,0.08);
+    border: 1px solid rgba(255,77,109,0.3);
+    border-radius: 4px;
+    padding: 1rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent2);
+    line-height: 1.6;
+  }
+
+  /* STABILITY BAR */
+  .stability-bar-wrap {
+    margin: 1rem 0;
+  }
+  .stability-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+  }
+  .stability-bar-bg {
+    background: var(--border);
+    border-radius: 2px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .stability-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* INFO TOOLTIP */
+  .info-note {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.5rem 0.7rem;
+    margin-top: 0.8rem;
+    line-height: 1.6;
+  }
+  .info-note span { color: var(--accent); }
+
+  /* Pn section */
+  .pn-field { display: none; }
+  .pn-field.visible { display: block; }
+
+  /* Unit info */
+  .unit-note {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-top: 0.25rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-tag">// herramienta analítica v2.0</div>
+    <h1>Teoría de <span>Colas</span></h1>
+    <div class="header-sub">Calculadora universal — M/M/1 · M/M/s · M/G/1 · M/M/1/K · Prioridades</div>
+  </header>
+
+  <!-- MODEL SELECTOR -->
+  <div class="model-grid" id="modelGrid">
+    <button class="model-btn active" data-model="mm1">
+      <span class="badge">M/M/1</span>
+      <span class="name">Un servidor estándar</span>
+    </button>
+    <button class="model-btn" data-model="mms">
+      <span class="badge">M/M/s</span>
+      <span class="name">Múltiples servidores</span>
+    </button>
+    <button class="model-btn" data-model="mg1">
+      <span class="badge">M/G/1</span>
+      <span class="name">Tiempos variables (P-K)</span>
+    </button>
+    <button class="model-btn" data-model="mm1k">
+      <span class="badge">M/M/1/K</span>
+      <span class="name">Capacidad finita</span>
+    </button>
+    <button class="model-btn" data-model="prio">
+      <span class="badge">PRIO</span>
+      <span class="name">Prioridades (2 clases)</span>
+    </button>
+  </div>
+
+  <div class="main-grid">
+    <!-- INPUT PANEL -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        <h2>Parámetros de Entrada</h2>
+      </div>
+      <div class="panel-body">
+
+        <!-- Time unit -->
+        <div class="field">
+          <label>Unidad de tiempo del sistema</label>
+          <select id="timeUnit">
+            <option value="hora">Por hora (clientes/hora)</option>
+            <option value="minuto">Por minuto (clientes/min)</option>
+            <option value="segundo">Por segundo (clientes/seg)</option>
+          </select>
+          <div class="unit-note">Todas las tasas deben estar en la misma unidad.</div>
+        </div>
+
+        <!-- Lambda -->
+        <div class="field" id="field-lam">
+          <label><span class="sym">λ</span>Tasa de llegada (Lambda)</label>
+          <input type="number" id="lam" placeholder="ej. 100" min="0" step="any">
+        </div>
+
+        <!-- Lambda 1 (prioridades) -->
+        <div class="field" id="field-lam1" style="display:none">
+          <label><span class="sym">λ₁</span>Tasa de llegada — CRÍTICOS</label>
+          <input type="number" id="lam1" placeholder="ej. 40" min="0" step="any">
+        </div>
+        <div class="field" id="field-lam2" style="display:none">
+          <label><span class="sym">λ₂</span>Tasa de llegada — NORMALES</label>
+          <input type="number" id="lam2" placeholder="ej. 60" min="0" step="any">
+        </div>
+
+        <!-- Mu -->
+        <div class="field">
+          <label><span class="sym">μ</span>Tasa de servicio (Mu)</label>
+          <input type="number" id="mu" placeholder="ej. 150" min="0" step="any">
+        </div>
+
+        <!-- s (M/M/s) -->
+        <div class="field" id="field-s" style="display:none">
+          <label><span class="sym">s</span>Número de servidores</label>
+          <input type="number" id="s" placeholder="ej. 3" min="1" step="1">
+        </div>
+
+        <!-- K (M/M/1/K) -->
+        <div class="field" id="field-k" style="display:none">
+          <label><span class="sym">K</span>Capacidad máxima del sistema</label>
+          <input type="number" id="k" placeholder="ej. 10" min="1" step="1">
+        </div>
+
+        <!-- Variance (M/G/1) -->
+        <div class="field" id="field-var" style="display:none">
+          <label><span class="sym">σ²</span>Varianza del tiempo de servicio</label>
+          <input type="number" id="var" placeholder="ej. 0.0001" min="0" step="any">
+          <div class="unit-note" id="varUnit">En unidades de tiempo² (misma base que λ y μ).</div>
+        </div>
+
+        <!-- Pn field -->
+        <div class="field pn-field" id="field-pn">
+          <label><span class="sym">n</span>Probabilidad P(n) — estado específico</label>
+          <input type="number" id="pn_n" placeholder="ej. 1" min="0" step="1" value="1">
+          <div class="unit-note">P(n) = prob. de que haya exactamente n clientes en sistema.</div>
+        </div>
+
+        <!-- Costs -->
+        <div class="checkbox-row" style="margin-top:1.2rem">
+          <input type="checkbox" id="showCosts">
+          <label class="checkbox-label" for="showCosts">Calcular análisis de costos</label>
+        </div>
+
+        <div class="cost-section" id="costSection">
+          <div class="field">
+            <label><span class="sym" style="color:var(--accent2)">Ce</span>Costo por servidor (por unidad de tiempo)</label>
+            <div class="input-row">
+              <span style="align-self:center;font-family:var(--mono);color:var(--text-dim);font-size:0.9rem">$</span>
+              <input type="number" id="ce" placeholder="ej. 25.00" min="0" step="any">
+            </div>
+          </div>
+          <div class="field">
+            <label><span class="sym" style="color:var(--accent2)">Cq</span>Costo de espera por cliente (por unidad de tiempo)</label>
+            <div class="input-row">
+              <span style="align-self:center;font-family:var(--mono);color:var(--text-dim);font-size:0.9rem">$</span>
+              <input type="number" id="cq" placeholder="ej. 10.00" min="0" step="any">
+            </div>
+          </div>
+        </div>
+
+        <button class="solve-btn" id="solveBtn">▶ Calcular</button>
+      </div>
+    </div>
+
+    <!-- RESULTS PANEL -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot" style="background:var(--accent3);box-shadow:0 0 8px var(--accent3)"></div>
+        <h2>Resultados</h2>
+      </div>
+      <div class="panel-body" id="resultsBody">
+        <div class="results-empty">
+          <div class="icon">◎</div>
+          <p>Ingresa los parámetros<br>y presiona Calcular</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===================== MODEL LOGIC =====================
+
+function mm1(lam, mu, pn_n) {
+  const rho = lam / mu;
+  if (rho >= 1) return { error: `Sistema inestable: ρ = ${rho.toFixed(4)} ≥ 1. La cola crecerá infinitamente.` };
+
+  const p0 = 1 - rho;
+  const L = lam / (mu - lam);
+  const Lq = rho * rho / (1 - rho);
+  const W = 1 / (mu - lam);
+  const Wq = rho / (mu - lam);
+  const Pn = p0 * Math.pow(rho, pn_n);
+
+  return { rho, p0, L, Lq, W, Wq, Pn, pn_n, s: 1 };
+}
+
+function mms(lam, mu, s, pn_n) {
+  const rho = lam / (s * mu);
+  if (rho >= 1) return { error: `Sistema inestable: ρ = ${rho.toFixed(4)} ≥ 1. Necesitas más servidores.` };
+
+  let suma = 0;
+  for (let n = 0; n < s; n++) {
+    suma += Math.pow(lam / mu, n) / factorial(n);
+  }
+  const termS = Math.pow(lam / mu, s) / (factorial(s) * (1 - rho));
+  const p0 = 1 / (suma + termS);
+
+  const Lq = (p0 * Math.pow(lam / mu, s) * rho) / (factorial(s) * Math.pow(1 - rho, 2));
+  const Wq = Lq / lam;
+  const W = Wq + 1 / mu;
+  const L = lam * W;
+
+  // P(n) general M/M/s
+  let Pn;
+  if (pn_n < s) {
+    Pn = p0 * Math.pow(lam / mu, pn_n) / factorial(pn_n);
+  } else {
+    Pn = p0 * Math.pow(lam / mu, pn_n) / (factorial(s) * Math.pow(s, pn_n - s));
+  }
+
+  return { rho, p0, L, Lq, W, Wq, Pn, pn_n, s };
+}
+
+function mg1(lam, mu, variance, pn_n) {
+  const rho = lam / mu;
+  if (rho >= 1) return { error: `Sistema inestable: ρ = ${rho.toFixed(4)} ≥ 1.` };
+
+  const Lq = (lam * lam * variance + rho * rho) / (2 * (1 - rho));
+  const Wq = Lq / lam;
+  const W = Wq + 1 / mu;
+  const L = lam * W;
+  const p0 = 1 - rho;
+  // M/G/1 no tiene fórmula exacta para Pn (solo P0)
+  const Pn = null;
+
+  return { rho, p0, L, Lq, W, Wq, Pn, pn_n, s: 1 };
+}
+
+function mm1k(lam, mu, K, pn_n) {
+  const rho = lam / mu;
+  let p0, pk, L;
+
+  if (Math.abs(rho - 1) < 1e-10) {
+    p0 = 1 / (K + 1);
+    pk = p0;
+    L = K / 2;
+  } else {
+    p0 = (1 - rho) / (1 - Math.pow(rho, K + 1));
+    pk = p0 * Math.pow(rho, K);
+    L = rho * (1 - (K + 1) * Math.pow(rho, K) + K * Math.pow(rho, K + 1)) /
+        ((1 - rho) * (1 - Math.pow(rho, K + 1)));
+  }
+
+  const lam_eff = lam * (1 - pk);
+  const Lq = L - (1 - p0);
+  const W = L / lam_eff;
+  const Wq = Lq / lam_eff;
+
+  // Pn for M/M/1/K
+  let Pn = null;
+  if (pn_n <= K) {
+    Pn = p0 * Math.pow(rho, pn_n);
+  }
+
+  return { rho, p0, pk, lam_eff, L, Lq, W, Wq, Pn, pn_n, s: 1, K };
+}
+
+function prioridades(lam1, lam2, mu, pn_n) {
+  const rho1 = lam1 / mu;
+  const rho2 = lam2 / mu;
+  const rho_total = rho1 + rho2;
+
+  if (rho_total >= 1) return { error: `Sistema inestable: ρ_total = ${rho_total.toFixed(4)} ≥ 1.` };
+
+  const Wq1 = (rho_total / mu) / (1 - rho1);
+  const Wq2 = (rho_total / mu) / ((1 - rho1) * (1 - rho_total));
+  const W1 = Wq1 + 1 / mu;
+  const W2 = Wq2 + 1 / mu;
+  const Lq1 = lam1 * Wq1;
+  const Lq2 = lam2 * Wq2;
+  const L1 = lam1 * W1;
+  const L2 = lam2 * W2;
+  const L_total = L1 + L2;
+
+  // Approx P0 for priority queue (M/M/1 with rho_total)
+  const p0 = 1 - rho_total;
+
+  return { rho_total, rho1, rho2, p0, Wq1, Wq2, W1, W2, Lq1, Lq2, L1, L2, L_total, s: 1 };
+}
+
+function factorial(n) {
+  if (n <= 1) return 1;
+  let r = 1;
+  for (let i = 2; i <= n; i++) r *= i;
+  return r;
+}
+
+// ===================== UI LOGIC =====================
+
+const modelBtns = document.querySelectorAll('.model-btn');
+let currentModel = 'mm1';
+
+modelBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    modelBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentModel = btn.dataset.model;
+    updateFields();
+  });
+});
+
+document.getElementById('showCosts').addEventListener('change', e => {
+  document.getElementById('costSection').classList.toggle('visible', e.target.checked);
+});
+
+function updateFields() {
+  const m = currentModel;
+  // show/hide fields
+  document.getElementById('field-lam').style.display = m === 'prio' ? 'none' : '';
+  document.getElementById('field-lam1').style.display = m === 'prio' ? '' : 'none';
+  document.getElementById('field-lam2').style.display = m === 'prio' ? '' : 'none';
+  document.getElementById('field-s').style.display = m === 'mms' ? '' : 'none';
+  document.getElementById('field-k').style.display = m === 'mm1k' ? '' : 'none';
+  document.getElementById('field-var').style.display = m === 'mg1' ? '' : 'none';
+  // Pn not meaningful for priorities
+  document.getElementById('field-pn').classList.toggle('visible', m !== 'prio');
+}
+
+updateFields();
+
+document.getElementById('solveBtn').addEventListener('click', () => {
+  const unit = document.getElementById('timeUnit').value;
+  const pn_n = parseInt(document.getElementById('pn_n').value) || 0;
+  const showCosts = document.getElementById('showCosts').checked;
+  const ce = parseFloat(document.getElementById('ce').value) || 0;
+  const cq = parseFloat(document.getElementById('cq').value) || 0;
+
+  let res;
+
+  try {
+    if (currentModel === 'prio') {
+      const lam1 = parseFloat(document.getElementById('lam1').value);
+      const lam2 = parseFloat(document.getElementById('lam2').value);
+      const mu = parseFloat(document.getElementById('mu').value);
+      if ([lam1, lam2, mu].some(isNaN) || lam1 <= 0 || lam2 <= 0 || mu <= 0)
+        throw new Error('Todos los parámetros deben ser números positivos.');
+      res = prioridades(lam1, lam2, mu, pn_n);
+    } else {
+      const lam = parseFloat(document.getElementById('lam').value);
+      const mu = parseFloat(document.getElementById('mu').value);
+      if ([lam, mu].some(isNaN) || lam <= 0 || mu <= 0)
+        throw new Error('Lambda y Mu deben ser números positivos.');
+
+      if (currentModel === 'mm1') res = mm1(lam, mu, pn_n);
+      else if (currentModel === 'mms') {
+        const s = parseInt(document.getElementById('s').value);
+        if (!s || s < 1) throw new Error('El número de servidores debe ser ≥ 1.');
+        res = mms(lam, mu, s, pn_n);
+      } else if (currentModel === 'mg1') {
+        const variance = parseFloat(document.getElementById('var').value);
+        if (isNaN(variance) || variance < 0) throw new Error('La varianza debe ser ≥ 0.');
+        res = mg1(lam, mu, variance, pn_n);
+      } else if (currentModel === 'mm1k') {
+        const K = parseInt(document.getElementById('k').value);
+        if (!K || K < 1) throw new Error('La capacidad K debe ser ≥ 1.');
+        res = mm1k(lam, mu, K, pn_n);
+      }
+    }
+  } catch(e) {
+    renderError(e.message);
+    return;
+  }
+
+  if (res.error) { renderError(res.error); return; }
+
+  renderResults(res, unit, showCosts, ce, cq);
+});
+
+function fmt(val, decimals = 4) {
+  return typeof val === 'number' ? val.toFixed(decimals) : val;
+}
+function fmtPct(val) { return (val * 100).toFixed(2) + '%'; }
+function fmtTime(val, unit) {
+  return val.toFixed(4) + ' ' + unit + (val !== 1 ? 's' : '');
+}
+function fmtClientes(val) { return val.toFixed(4) + ' clientes'; }
+
+function renderError(msg) {
+  document.getElementById('resultsBody').innerHTML = `
+    <div class="error-box">⚠ ${msg}</div>`;
+}
+
+function renderResults(res, unit, showCosts, ce, cq) {
+  const body = document.getElementById('resultsBody');
+  let html = '';
+
+  // ---- Stability bar (use rho or rho_total) ----
+  const rhoDisplay = res.rho !== undefined ? res.rho : res.rho_total;
+  const barPct = Math.min(rhoDisplay * 100, 100);
+  const barColor = rhoDisplay < 0.7 ? '#a8ff3e' : rhoDisplay < 0.9 ? '#f59e0b' : '#ff4d6d';
+
+  html += `
+    <div class="stability-bar-wrap">
+      <div class="stability-label">
+        <span>UTILIZACIÓN DEL SISTEMA</span>
+        <span style="color:${barColor};font-weight:700">${fmtPct(rhoDisplay)}</span>
+      </div>
+      <div class="stability-bar-bg">
+        <div class="stability-bar-fill" style="width:${barPct}%;background:${barColor}"></div>
+      </div>
+    </div>`;
+
+  // ---- Core metrics ----
+  html += `<div class="result-section"><div class="result-section-title">Métricas del Sistema</div>`;
+
+  if (currentModel !== 'prio') {
+    html += row('Prob. sistema vacío', 'P₀', fmtPct(res.p0), 'highlight');
+
+    if (currentModel === 'mm1k') {
+      html += row('Prob. bloqueo/pérdida', `P(K=${res.K})`, fmtPct(res.pk), 'warn');
+      html += row('Tasa efectiva de llegada', 'λ_eff', fmt(res.lam_eff) + ` cl/${unit}`, '');
+    }
+
+    if (res.Pn !== null && res.Pn !== undefined) {
+      html += row(`Prob. de exactamente ${res.pn_n} cliente(s)`, `P(${res.pn_n})`, fmtPct(res.Pn), 'warn');
+    }
+
+    html += row('Clientes en el sistema', 'L', fmtClientes(res.L), '');
+    html += row('Clientes en la cola', 'Lq', fmtClientes(res.Lq), '');
+    html += row(`Tiempo en sistema`, 'W', fmtTime(res.W, unit), '');
+    html += row(`Tiempo en cola`, 'Wq', fmtTime(res.Wq, unit), '');
+  } else {
+    // Prioridades
+    html += row('Prob. sistema vacío', 'P₀', fmtPct(res.p0), 'highlight');
+    html += row('Utilización clase críticos', 'ρ₁', fmtPct(res.rho1), '');
+    html += row('Utilización clase normales', 'ρ₂', fmtPct(res.rho2), '');
+  }
+
+  html += `</div>`;
+
+  // ---- Priority detail ----
+  if (currentModel === 'prio') {
+    html += `<div class="result-section"><div class="result-section-title">Clase Críticos (Prioridad 1)</div>`;
+    html += row('Tiempo en cola', 'Wq₁', fmtTime(res.Wq1, unit), 'highlight');
+    html += row('Tiempo en sistema', 'W₁', fmtTime(res.W1, unit), '');
+    html += row('Clientes en cola', 'Lq₁', fmtClientes(res.Lq1), '');
+    html += row('Clientes en sistema', 'L₁', fmtClientes(res.L1), '');
+    html += `</div>`;
+
+    html += `<div class="result-section"><div class="result-section-title">Clase Normales (Prioridad 2)</div>`;
+    html += row('Tiempo en cola', 'Wq₂', fmtTime(res.Wq2, unit), 'warn');
+    html += row('Tiempo en sistema', 'W₂', fmtTime(res.W2, unit), '');
+    html += row('Clientes en cola', 'Lq₂', fmtClientes(res.Lq2), '');
+    html += row('Clientes en sistema', 'L₂', fmtClientes(res.L2), '');
+    html += `</div>`;
+
+    html += `<div class="result-section"><div class="result-section-title">Sistema Total</div>`;
+    html += row('Clientes totales en sistema', 'L', fmtClientes(res.L_total), 'highlight');
+    html += `</div>`;
+  }
+
+  // ---- Costs ----
+  if (showCosts && ce > 0 && cq > 0) {
+    const servers = res.s || 1;
+    const L = res.L || res.L_total;
+    const costoServicio = servers * ce;
+    const costoEspera = L * cq;
+    const costoTotal = costoServicio + costoEspera;
+
+    html += `<div class="result-section"><div class="result-section-title">Análisis Económico</div>`;
+    html += row(`Costo servicio (${servers} × $${ce})`, 'S×Ce', '$' + costoServicio.toFixed(2), 'cost');
+    html += row(`Costo espera (L × $${cq})`, 'L×Cq', '$' + costoEspera.toFixed(2), 'cost');
+    html += row('Costo total del sistema', 'Ct', '$' + costoTotal.toFixed(2), 'highlight cost');
+    html += `</div>`;
+  }
+
+  // ---- Info note ----
+  html += `<div class="info-note">
+    <span>Nota:</span> W y Wq están expresados en <strong>${unit}s</strong>.
+    Para convertir: multiplica por 60 para pasar a minutos si ingresaste tasas por hora.
+    Verifica que λ y μ estén en la misma unidad de tiempo.
+  </div>`;
+
+  body.innerHTML = html;
+
+  // Animate bar
+  setTimeout(() => {
+    const fill = body.parentElement.querySelector ? document.querySelector('.stability-bar-fill') : null;
+    if (fill) fill.style.width = barPct + '%';
+  }, 50);
+}
+
+function row(label, formula, value, cls = '') {
+  return `<div class="result-row">
+    <div class="result-key">${label}<span class="formula">${formula}</span></div>
+    <div class="result-val ${cls}">${value}</div>
+  </div>`;
+}
+</script>
+</body>
+</html>
